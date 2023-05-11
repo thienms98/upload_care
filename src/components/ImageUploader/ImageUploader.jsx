@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { uploadFile } from '@uploadcare/upload-client';
-// import { fileInfo, UploadcareSimpleAuthSchema } from "@uploadcare/rest-client";
+import { deleteFile, listOfFiles, UploadcareSimpleAuthSchema } from '@uploadcare/rest-client';
 
 export default function ImageUploader() {
   const [fileName, setFileName] = useState('');
   const [fileUUID, setFileUUID] = useState('');
   const [fileUrl, setFileUrl] = useState('');
+  const [list, setList] = useState([]);
 
   // fileData must be `Blob`, `File`, `Buffer`, UUID, CDN URL or Remote URL
   const upload = async (fileData) => {
@@ -20,6 +21,7 @@ export default function ImageUploader() {
     console.log(result);
     setFileUUID(result.uuid);
     setFileUrl(result.cdnUrl);
+    getList();
   };
 
   // get cdn link - url by uuid
@@ -41,19 +43,75 @@ export default function ImageUploader() {
   //   });
   // }, [fileUUID]);
 
+  // get images uploaded list
+  const uploadcareSimpleAuthSchema = new UploadcareSimpleAuthSchema({
+    publicKey: '5ba79114515337330f64',
+    secretKey: '0fee1891e96bda69f30c',
+  });
+
+  function getList() {
+    listOfFiles({}, { authSchema: uploadcareSimpleAuthSchema }).then((res) => setList(res.results));
+  }
+  async function deleteItem(uuid) {
+    await deleteFile(
+      {
+        uuid,
+      },
+      { authSchema: uploadcareSimpleAuthSchema },
+    );
+    getList();
+  }
+
+  useEffect(() => {
+    getList();
+  }, []);
+
   return (
     <>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          upload(new Blob(e.target.file.files));
         }}
       >
-        <input type="file" name="file" id="" onChange={(e) => setFileName(e.target.files[0].name)} />
-        <input type="submit" value="Upload" />
+        <button>
+          <label htmlFor="file" style={{ fontSize: '32px' }}>
+            Upload here
+          </label>
+        </button>
+        <input
+          type="file"
+          name="file"
+          id="file"
+          hidden
+          onChange={(e) => {
+            setFileName(e.target.files[0].name);
+            upload(new Blob(e.target.files));
+          }}
+        />
       </form>
 
       <img src={fileUrl} alt="" width={500} />
+      <hr />
+
+      <h3>Right click to remove image</h3>
+      <div>
+        {list.map((image) => {
+          return (
+            <>
+              <img
+                src={image.originalFileUrl}
+                key={image.uuid}
+                alt=""
+                width={200}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  deleteItem(image.uuid);
+                }}
+              />
+            </>
+          );
+        })}
+      </div>
     </>
   );
 }
